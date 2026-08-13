@@ -60,20 +60,8 @@ services:
         condition: service_completed_successfully
     ports:
       - "8089:8089"
-    environment:
-      DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:-MasterGYM}?createDatabaseIfNotExist=true
-      DB_USER: ${DB_USER:-ali}
-      DB_PASSWORD: ${DB_PASSWORD:-root}
-      JWT_SECRET: ${JWT_SECRET}
-      MINIO_URL: http://minio:9000
-      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9020}
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-      MINIO_BUCKET: ${MINIO_BUCKET:-master-gym}
-      ADMIN_DISPLAY_NAME: ${ADMIN_DISPLAY_NAME:-Admin}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
-      ADMIN_TELEPHONE: ${ADMIN_TELEPHONE:-22865991}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ali1234}
+    env_file:
+      - .env
 
 volumes:
   mastergym-mysql-data:

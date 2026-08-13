@@ -2,62 +2,76 @@ package com.BackEnd.Master.GYM.ExceptionHandler;
 
 import com.BackEnd.Master.GYM.Exceptions.EntityNotFoundException;
 import com.BackEnd.Master.GYM.Exceptions.InvalidEntityException;
+import com.BackEnd.Master.GYM.Exceptions.ResourceNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<String> handleRuntimeException(RuntimeException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleEntityNotFoundException(EntityNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "Entity Not Found", ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(InvalidEntityException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidEntityException(InvalidEntityException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "Invalid Entity Data", ex.getMessage(), request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException ex) {
-        return new ResponseEntity<>(ex.getMessage(), HttpStatus.NOT_FOUND);
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Map<String, String> handleValidationExceptions(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new HashMap<>();
+    public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        Map<String, String> fieldErrors = new HashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(error ->
-                errors.put(error.getField(), error.getDefaultMessage()));
-        return errors;
+                fieldErrors.put(error.getField(), error.getDefaultMessage()));
+        return build(HttpStatus.BAD_REQUEST, "Validation Failed", "Request validation failed", request, fieldErrors);
     }
 
-    // Gestion des erreurs pour EntityNotFoundException
-    @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleEntityNotFoundException(EntityNotFoundException ex) {
-        Map<String, String> response = new HashMap<>();
-        response.put("error", "Entity Not Found");
-        response.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    // Catch-all for exceptions raised as plain RuntimeException (e.g. "Profile image is required",
+    // MinIO upload failures) that don't warrant their own dedicated type
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), request);
     }
 
-    // Gestion des erreurs pour InvalidEntityException
-    @ExceptionHandler(InvalidEntityException.class)
-    public ResponseEntity<Map<String, String>> handleInvalidEntityException(InvalidEntityException ex) {
-        Map<String, String> response = new HashMap<>();
-        response.put("error", "Invalid Entity Data");
-        response.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-    }
-
-    // Gestion des exceptions générales
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleGeneralException(Exception ex) {
-        Map<String, String> response = new HashMap<>();
-        response.put("error", "Internal Server Error");
-        response.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex, HttpServletRequest request) {
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", ex.getMessage(), request);
+    }
+
+    // Single point every handler above goes through, so the API never has a handler that
+    // slips back to returning a raw-text body instead of this JSON shape
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String error, String message, HttpServletRequest request) {
+        return build(status, error, message, request, null);
+    }
+
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String error, String message,
+                                                 HttpServletRequest request, Map<String, String> fieldErrors) {
+        ErrorResponse body = new ErrorResponse(
+                Instant.now(),
+                status.value(),
+                error,
+                message,
+                request.getRequestURI(),
+                fieldErrors);
+        return ResponseEntity.status(status).body(body);
     }
 }

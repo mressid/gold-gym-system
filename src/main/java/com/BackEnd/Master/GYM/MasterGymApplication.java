@@ -45,6 +45,11 @@ public class MasterGymApplication {
 	@Bean
 	public CommandLineRunner initDatabase() {
 		return args -> {
+			if (adminDisplayName == null || adminEmail == null || adminPassword == null || adminTelephone == null) {
+				System.err.println("Admin user details are not set in the environment variables. Please set ADMIN_DISPLAY_NAME, ADMIN_EMAIL, ADMIN_PASSWORD, and ADMIN_CONTACT_NUMBER.");
+				System.exit(1);
+			}
+
 			// Vérifier si un rôle "Admin" existe, sinon le créer
 			Optional<Roles> adminRoleOpt = rolesRepo.findByRoleName("ROLE_Admin");
 			Roles adminRole = adminRoleOpt.orElseGet(() -> {
